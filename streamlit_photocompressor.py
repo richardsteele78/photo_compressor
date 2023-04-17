@@ -4,13 +4,13 @@ import numpy as np
 from PIL import Image
 from sklearn.cluster import KMeans
 import streamlit as st
-import plotly.express as px
+#import plotly.express as px
 import pandas as pd
 import matplotlib.pyplot as plt
- 
+
 st.header("📷 K-MEANS PHOTO COMPRESSION")
-img_file_buffer = st.camera_input("Take a picture")
-num_of_centroids = st.slider(label="Select number of colours (KMEANS CLUSTERS) to compress image",min_value=2,max_value=20,value=4)
+img_file_buffer = st.camera_input("Generate a dataset by taking a photograph")
+num_of_centroids = st.slider(label="Select number of colours (using K-MEANS clustering) to compress image",min_value=2,max_value=20,value=4)
 
 if img_file_buffer is not None:
     # To read image file buffer as a PIL Image:
@@ -43,22 +43,49 @@ if img_file_buffer is not None:
         #st.balloons()
         return compressed_im
     compress_image(pixel_centroids_reshaped)
-    st.header("RGB Codes of " + str(num_of_centroids) + " colours")
+    st.header("RGB Codes of " + str(num_of_centroids) + " colour clusters")
     #df['Red'] = compressor.cluster_centers_
     fulldf = pd.DataFrame(data=pixel_np , columns=['RED','GREEN','BLUE'])
+    fulldf['RGBCODE'] =  tuple(zip(fulldf["RED"]/255., fulldf["GREEN"]/255., fulldf["BLUE"]/255.))
     df = pd.DataFrame(data=compressor.cluster_centers_ , columns=['RED','GREEN','BLUE'])
-    df['RGBCODE'] = '(' + df["RED"].astype(str) + ',' + df["GREEN"].astype(str) + ',' + df["BLUE"].astype(str) + ')'
+    df['RGBCODE'] =  tuple(zip(df["RED"]/255., df["GREEN"]/255., df["BLUE"]/255.))
     st.write(df)
-    fig1 = px.scatter_3d(df, x='RED', y='GREEN', z='BLUE')
-    st.plotly_chart(fig1)
-    fullscatter = st.button("Load full pixel scatter? (takes a few seconds)")
+    #fig1 = px.scatter_3d(df, x='RED', y='GREEN', z='BLUE')
+    #st.plotly_chart(fig1)
+    
+    fullscatter = st.button("Load full pixel scatter (with clusters)? (takes a few seconds)")
     if fullscatter:
-#        fig2 = px.scatter_3d(fulldf, x='RED', y='GREEN', z='BLUE')
-#        fig2.update_traces(marker_size = 1)
-#        st.plotly_chart(fig2)
-        fig3 = plt.figure()
-        ax = fig3.add_subplot(projection='3d')
+        fig2 = plt.figure(figsize=plt.figaspect(0.5))
+        ax = fig2.add_subplot(projection='3d')
+        #ax = plt.subplot(111,aspect = 'equal')
         # Creating plot
-        ax.scatter(xs=fulldf['RED'], ys=fulldf['GREEN'], zs=fulldf['BLUE'],s = 1,alpha=0.01, color = "gray")
-        ax.scatter(xs=df['RED'], ys=df['GREEN'], zs=df['BLUE'],s = 50,alpha=1,c="black") #, color = "green")
+        fullcolors=np.array(fulldf['RGBCODE'])
+        ax.scatter(xs=fulldf['RED'], ys=fulldf['GREEN'], zs=fulldf['BLUE'],s = 3,alpha=0.01, c = fullcolors)
+        x=df['RED']
+        y=df['GREEN']
+        z=df['BLUE']
+        colors=np.array(df['RGBCODE'])
+        ax.scatter(xs=x, ys=y, zs=z,s = 100,alpha=1,c=colors,edgecolors="black")
+        ax.set_xlabel('R')
+        ax.set_ylabel('G')
+        ax.set_zlabel('B',labelpad=0.50)
+        ax.set_title("Scatter plot of pixels in 3D (RGB) space")
+        st.pyplot(fig2)
+        st.caption("Note that the diagonal betweeen (0,0,0) and (255,255,255) corresponds the greyscale diagonal between white and black")
+        
+    loadelbow = st.button("Evaluate Elbow plot? (takes around 1-2 minutes!)")
+    if loadelbow:
+        my_bar = st.progress(0)
+        #PLOT ELBOW
+        inertia = []
+        for i in range(2,21):
+            compressor = fit_kmeans_model(pixel_np,i)
+            inertia.append(compressor.inertia_)
+            my_bar.progress((i-1) / 19)
+        fig3 = plt.figure()
+        ax = fig3.add_subplot()
+        # Creating plot
+        ax.scatter(x=np.arange(1,20), y=inertia)
+        ax.set_xlabel('Number of clusters')
+        ax.set_ylabel('Inertia')
         st.pyplot(fig3)
